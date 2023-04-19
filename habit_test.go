@@ -45,3 +45,82 @@ func TestProcessUserInput(t *testing.T) {
 		})
 	}
 }
+
+func TestAddHabit(t *testing.T) {
+	db, err := habit.SetUpDatabase()
+	defer db.Close()
+	if err != nil {
+		t.Errorf("got %v, want %v", err, nil)
+	}
+
+	tracker := habit.NewHabitTracker(db)
+
+	err = tracker.AddHabit("test")
+	if err != nil {
+		t.Errorf("got %v, want %v", err, nil)
+	}
+}
+
+func TestGetHabit(t *testing.T) {
+	db, err := habit.SetUpDatabase()
+	defer db.Close()
+	if err != nil {
+		t.Errorf("got %v, want %v", err, nil)
+	}
+
+	tracker := habit.NewHabitTracker(db)
+
+	err = tracker.AddHabit("test")
+	if err != nil {
+		t.Errorf("got %v, want %v", err, nil)
+	}
+
+	habit, err := tracker.GetHabit("test")
+	if err != nil {
+		t.Errorf("got %v, want %v", err, nil)
+	}
+
+	if habit.Name != "test" {
+		t.Errorf("got %v, want %v", habit.Name, "test")
+	}
+}
+
+func TestGetHabitNotFound(t *testing.T) {
+	db, err := habit.SetUpDatabase()
+	defer db.Close()
+	if err != nil {
+		t.Errorf("got %v, want %v", err, nil)
+	}
+
+	tracker := habit.NewHabitTracker(db)
+
+	_, err = tracker.GetHabit("test2")
+	if err == nil {
+		t.Errorf("got %v, want %v", err, nil)
+	}
+}
+
+func TestCheckForStreakAndUpdate(t *testing.T) {
+	db, err := habit.SetUpDatabase()
+	defer db.Close()
+	if err != nil {
+		t.Errorf("got %v, want %v", err, nil)
+	}
+
+	tracker := habit.NewHabitTracker(db)
+
+	err = tracker.AddHabit("test")
+	if err != nil {
+		t.Errorf("got %v, want %v", err, nil)
+	}
+
+	testHabit, err := tracker.CheckForStreakAndUpdate("test")
+	if err == nil {
+		t.Errorf("got %v, want %v", err, nil)
+	}
+
+	if testHabit.Streak != 1 {
+		t.Errorf("got %v, want %v", testHabit.Streak, 1)
+	}
+
+}
