@@ -3,6 +3,7 @@ package habitfield_test
 import (
 	"bytes"
 	habit "github.com/RyanRalphs/habitfield"
+	"os"
 	"testing"
 )
 
@@ -46,36 +47,42 @@ func TestProcessUserInput(t *testing.T) {
 	}
 }
 
-func TestAddHabit(t *testing.T) {
-	db, err := habit.SetUpDatabase()
-	defer db.Close()
+var ht *habit.Tracker
+var dbName = "test.db"
+
+func setupTest() func() {
+	if _, err := os.Stat(dbName); err == nil {
+		os.Remove(dbName)
+	}
+	db, err := habit.OpenDatabase(dbName)
+
 	if err != nil {
-		t.Errorf("got %v, want %v", err, nil)
+		panic(err)
 	}
 
-	tracker := habit.NewHabitTracker(db)
+	ht = habit.NewTracker(db)
 
-	err = tracker.AddHabit("test")
+	return func() {
+		defer db.Close()
+	}
+}
+
+func TestAddingANewHabit(t *testing.T) {
+	defer setupTest()()
+	err := ht.AddHabit("test")
 	if err != nil {
 		t.Errorf("got %v, want %v", err, nil)
 	}
 }
 
-func TestGetHabit(t *testing.T) {
-	db, err := habit.SetUpDatabase()
-	defer db.Close()
+func TestRetrievingAStoredHabit(t *testing.T) {
+	defer setupTest()()
+	err := ht.AddHabit("test")
 	if err != nil {
 		t.Errorf("got %v, want %v", err, nil)
 	}
 
-	tracker := habit.NewHabitTracker(db)
-
-	err = tracker.AddHabit("test")
-	if err != nil {
-		t.Errorf("got %v, want %v", err, nil)
-	}
-
-	habit, err := tracker.GetHabit("test")
+	habit, err := ht.GetHabit("test")
 	if err != nil {
 		t.Errorf("got %v, want %v", err, nil)
 	}
@@ -85,36 +92,22 @@ func TestGetHabit(t *testing.T) {
 	}
 }
 
-func TestGetHabitNotFound(t *testing.T) {
-	db, err := habit.SetUpDatabase()
-	defer db.Close()
-	if err != nil {
-		t.Errorf("got %v, want %v", err, nil)
-	}
-
-	tracker := habit.NewHabitTracker(db)
-
-	_, err = tracker.GetHabit("test2")
+func TestRetrievingAHabitThatDoesntExist(t *testing.T) {
+	defer setupTest()()
+	_, err := ht.GetHabit("test2")
 	if err == nil {
 		t.Errorf("got %v, want %v", err, nil)
 	}
 }
 
-func TestCheckForStreakAndUpdate(t *testing.T) {
-	db, err := habit.SetUpDatabase()
-	defer db.Close()
+func TestStreakUpdatingOfHabits(t *testing.T) {
+	defer setupTest()()
+	err := ht.AddHabit("test")
 	if err != nil {
 		t.Errorf("got %v, want %v", err, nil)
 	}
 
-	tracker := habit.NewHabitTracker(db)
-
-	err = tracker.AddHabit("test")
-	if err != nil {
-		t.Errorf("got %v, want %v", err, nil)
-	}
-
-	testHabit, err := tracker.CheckForStreakAndUpdate("test")
+	testHabit, err := ht.UpdateHabit("test")
 	if err == nil {
 		t.Errorf("got %v, want %v", err, nil)
 	}
@@ -122,5 +115,4 @@ func TestCheckForStreakAndUpdate(t *testing.T) {
 	if testHabit.Streak != 1 {
 		t.Errorf("got %v, want %v", testHabit.Streak, 1)
 	}
-
 }

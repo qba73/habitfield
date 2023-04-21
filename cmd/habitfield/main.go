@@ -20,29 +20,30 @@ func main() {
 		log.Fatal(err)
 	}
 
-	db, err := habit.SetUpDatabase()
+	db, err := habit.OpenDatabase("habits")
 	defer db.Close()
 	if err != nil {
 		fmt.Println(err)
 	}
 
-	tracker := habit.NewHabitTracker(db)
+	tracker := habit.NewTracker(db)
 
-	err = tracker.AddHabit(input)
-	if err != nil {
-		fmt.Println(err)
-	}
 	record, err := tracker.GetHabit(input)
 
 	if err != nil {
-		fmt.Println(err)
+		err = tracker.AddHabit(input)
+		os.Exit(0)
 	}
-
-	record, err = tracker.CheckForStreakAndUpdate(record.Name)
 
 	if err != nil {
 		fmt.Println(err)
 	}
 
-	fmt.Println(record)
+	record, err = tracker.UpdateHabit(record.Name)
+
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	fmt.Printf("%+v", record)
 }

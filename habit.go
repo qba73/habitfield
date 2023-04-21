@@ -9,15 +9,19 @@ import (
 	"time"
 )
 
-type HabitTracker struct {
+type Tracker struct {
 	db *storm.DB
 }
 
 type Habit struct {
 	ID                int    `storm:"id,increment"`
-	Name              string `storm:"index,unique"`
+	Name              string `storm:"unique"`
 	LastRecordedEntry time.Time
-	Streak            int32 `storm:"index"`
+	Streak            int32
+}
+
+func NewTracker(db *storm.DB) *Tracker {
+	return &Tracker{db: db}
 }
 
 func ProcessUserInput(userInput []string, writer io.Writer) (string, error) {
@@ -36,86 +40,83 @@ func ProcessUserInput(userInput []string, writer io.Writer) (string, error) {
 	return "", fmt.Errorf("%s is not a habit command", userInput[0])
 }
 
-func NewHabitTracker(db *storm.DB) *HabitTracker {
-	return &HabitTracker{db: db}
-}
+func (t *Tracker) AddHabit(name string) error {
+	habit := Habit{Name: name, LastRecordedEntry: time.Now(), Streak: 1}
 
-func (ht *HabitTracker) AddHabit(habitName string) error {
-	_, err := ht.GetHabit(habitName)
-	if err != nil {
-
-		todaysDate := time.Now().Format(time.RFC3339)
-		lastRecordedEntry, err := time.Parse(time.RFC3339, todaysDate)
-		if err != nil {
-			return err
+	if err := t.db.Save(&habit); err != nil {
+		if errors.Is(err, storm.ErrAlreadyExists) {
+			return fmt.Errorf("habit already exists: %s", name)
 		}
-
-		habit := Habit{
-			Name:              habitName,
-			LastRecordedEntry: lastRecordedEntry,
-			Streak:            1,
-		}
-
-		err = ht.db.Save(&habit)
-		if err != nil {
-			return err
-		}
-
-		fmt.Println("Habit Added!")
-		return nil
-
+		return fmt.Errorf("failed to save habit: %v", err)
 	}
-	return err
+
+	fmt.Println("Habit added!")
+	return nil
 }
 
-func (ht *HabitTracker) GetHabit(habitName string) (Habit, error) {
+func (t *Tracker) GetHabit(name string) (Habit, error) {
 	var habit Habit
-	err := ht.db.One("Name", habitName, &habit)
-	if err != nil {
-		return habit, err
+	if err := t.db.One("Name", name, &habit); err != nil {
+		if err == storm.ErrNotFound {
+			return habit, fmt.Errorf("habit not found: %s", name)
+		}
+		return habit, fmt.Errorf("failed to get habit: %v", err)
 	}
 	return habit, nil
 }
 
-func (ht *HabitTracker) CheckForStreakAndUpdate(habitName string) (Habit, error) {
-	var habit Habit
-	err := ht.db.One("Name", habitName, &habit)
-	if err != nil {
-		fmt.Println(err)
-		return habit, errors.New("habit not found")
-	}
-
-	todaysDate := time.Now().Format(time.RFC3339)
-	lastRecordedEntry, err := time.Parse(time.RFC3339, todaysDate)
+func (t *Tracker) UpdateHabit(name string) (Habit, error) {
+	habit, err := t.GetHabit(name)
 	if err != nil {
 		return habit, err
 	}
 
-	if lastRecordedEntry.Day() == habit.LastRecordedEntry.Day() {
-		return habit, errors.New("habit already recorded for today")
+	now := time.Now()
+	if now.Day() == habit.LastRecordedEntry.Day() {
+		return habit, fmt.Errorf("habit already recorded for today")
 	}
 
-	habit.LastRecordedEntry = lastRecordedEntry
+	habit.LastRecordedEntry = now
 	habit.Streak++
 
-	err = ht.db.Save(&habit)
-	if err != nil {
-		return habit, err
+	if err := t.db.Update(habit); err != nil {
+		return habit, fmt.Errorf("failed to update habit: %v", err)
 	}
 
-	fmt.Println("Habit Updated!")
+	fmt.Println("Habit updated!")
 	return habit, nil
+}
+
+func (t *Tracker) ListHabits(writer io.Writer) error {
+	var habits []Habit
+	if err := t.db.All(&habits); err != nil {
+		return fmt.Errorf("failed to list habits: %v", err)
+	}
+
+	if len(habits) == 0 {
+		fmt.Fprintln(writer, "No habits found.")
+		return nil
+	}
+
+	fmt.Fprintln(writer, "Habit streaks:")
+	for _, habit := range habits {
+		fmt.Fprintf(writer, "%s: %d\n", habit.Name, habit.Streak)
+	}
+
+	return nil
+}
+
+func (t *Tracker) Close() error {
+	return t.db.Close()
 }
 
 func PrintHelp(writer io.Writer) {
-	fmt.Fprintf(writer, "Welcome to your personal habit tracker!! \n \nTo add a habit, simply run `go run cmd/habitfield/main.go habit <habit>` \nIf you want to see how your habit streaks are going, simply run `go run cmd/habitfield/main.go habit` to see all stored habits and the current streak.\n \n")
+	fmt.Fprintf(writer, "Welcome to your personal habit tracker!!\n\n"+
+		"To add a habit, run `habitfield add <habit>`.\n"+
+		"To update a habit, run `habitfield update <habit>`.\n"+
+		"To list all habits, run `habitfield list`.\n\n")
 }
 
-func SetUpDatabase() (*storm.DB, error) {
-	db, err := storm.Open("test.db")
-	if err != nil {
-		return db, err
-	}
-
-	return db, nil
+func OpenDatabase(databaseName string) (*storm.DB, error) {
+	return storm.Open(databaseName)
 }
