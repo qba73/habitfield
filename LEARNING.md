@@ -101,4 +101,22 @@ How about to guide users by hand and make them feel satisfied?
 
 How the user experience can be improved?
 
-##
+## Code
+
+### Tests
+
+- I like naming convention. It's short and clear. Tests are ``external`` and run against package's public API.
+- Nice use of table tests to group multiple scenarios. How about to separate ``positive`` and ``negative`` cases?
+- How about make table tests (var ``scenarios``) not a global variable but internal to a test func? What impact could it have on running tests in parallel and avoid possible race conditions?
+- Is using two var names ``got`` and ``input`` to keep the same value necessary? How about to use only ``got`` and ``want``? Would it improve readability? Would it decrease or increase cognitive load?
+- Do we really care what error string the func returns, or only about the fact that the error occurs? Do we have a business logic that cares about error types? Assuming that the func errors, do we want to fail the test because of business logic problem or because someone (potentally by mistake) changed error string?
+- Great approach with using bytes.Buffer for handling fake outputs! This is a nice way of avoiding printing messages from tests.
+- vars `ht` and `dbName` are global. What can happen if tests would want to simultanously access for reading / writing? Is data safe from being corrupted? If tests would be executed in parallel how we could avoid race conditions? How about each test having its own obility to setup and tear down pre-conditions?
+- Creating pre-conditions in tests - If an error happens during the db setup, how would you inform test runner about it? How about to leverage t.Helper() func from the testing package? Where would you benefit from using ``t.Fatal`` method?
+- I like the fact that you re-create db for each test. Does the syntax ``defer setupTest()()`` show clearly intent for a reader? How to approach cleaning resources after each test with functions / methods from the ``testing`` pkg?
+- I really like your short error messages in tests. Using ``want`` and ``got`` make code clear and nicely shows the intent.
+
+### Code
+
+- NewTracker depends on a particular DB storage. How about to abstract store, for example if some user of your package would like to use MySQL?
+- It shapes really nicely! All tests pass. I like the functionality, how can I make it work on my machine?

@@ -2,9 +2,10 @@ package habitfield_test
 
 import (
 	"bytes"
-	habit "github.com/RyanRalphs/habitfield"
 	"os"
 	"testing"
+
+	habit "github.com/RyanRalphs/habitfield"
 )
 
 var scenarios = []struct {
